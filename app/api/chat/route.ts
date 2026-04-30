@@ -1,79 +1,125 @@
-import OpenAI from "openai";
 import { NextResponse } from "next/server";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+function json(data: any, init?: ResponseInit) {
+  return NextResponse.json(data, { ...init, headers: { ...corsHeaders, ...init?.headers } });
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
+}
 
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json();
+    const body = await req.json();
+    const { messages } = body;
+    // Accept both { messages: [...] } and { message: "text" } formats.
+  const incomingMessages = messages ?? (body.message ? [{ role: "user", text: body.message }] : []);
+  if (!Array.isArray(incomingMessages) || incomingMessages.length === 0) {
+    return json({ error: "Invalid request format: expected 'messages' array or 'message' string" }, { status: 400 });
+  }
 
     const apiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    
+    const baseURL = process.env.OPENAI_BASE_URL || "https://openrouter.ai/api";
     if (!apiKey) {
-      return NextResponse.json(
-        { error: "API key is missing. Ensure OPENAI_API_KEY is set." },
-        { status: 500 }
-      );
+      return json({ error: "API key missing" }, { status: 500 });
     }
 
-    const openai = new OpenAI({
-      apiKey,
-      baseURL: process.env.OPENAI_BASE_URL, // Optional compatible base URL
-    });
+    // Prompt: direct Romanian answer, no analysis.
+ const systemInstruction = `Ești Asistentul Virtual AutoConnect — consultant expert în înmatriculare auto în Bulgaria pentru clienți din România.
 
-    const systemInstruction = `
-Ești un asistent AI de vânzări și suport pentru o companie românească ce intermediază înmatriculări auto în Bulgaria.
+=== SERVICII ȘI PREȚURI ===
 
-Rolul tău:
-1. Să răspunzi clar și scurt la întrebările despre proces.
-2. Să explici modelul nostru de operare: lucrăm pe BATCH-URI (loturi) de 3-10 mașini pentru a reduce costurile și timpul.
-3. Să creezi un sentiment de urgență politicos: locurile într-un batch sunt limitate.
-4. Să împingi utilizatorul să lase datele în formularul de pe site și să rezerve un loc.
-5. După ce utilizatorul își exprimă interesul de a rezerva un loc, solicită-i să confirme avansul de 600€. Explică-i scurt că acest avans acoperă o parte din costurile operaționale și taxele inițiale, restul urmând să fie achitat la finalizare. Îndrumă-l să folosească formularul principal de pe pagină pentru a finaliza plata securizată prin Stripe (care emite automat și factură).
+Pachetul Basic (900–1100€):
+• Procesarea completă a actelor în Bulgaria
+• Traduceri autorizate + taxe notar
+• Taxe autorități BG incluse
+• RCA Bulgaria pe 1 lună inclus
+• ITP Bulgaria (valabil în RO) inclus
+• NU include transport — clientul aduce personal mașina în Ruse
 
-Procesul pe scurt (în caz că te întreabă):
-- Trimit datele mașinii (prin formularul de pe site).
-- Achită avansul fix de 600€ prin Stripe pentru confirmare și emitere factură.
-- Noi transportăm lotul spre Bulgaria.
-- Acolo facem ITP, RCA și acte.
-- Returnăm mașina gata de drum în 5-10 zile, moment în care se achită restul sumei.
+Pachetul Standard (1100–1300€) — CEL MAI POPULAR:
+• Tot ce include Basic
+• Transport pe platformă dus-întors de la domiciliul clientului
+• Asigurare pe durata transportului
+• Ridicare mașină de la domiciliu + returnare cu acte gata
 
-Ton: Profesional, săritor, sigur pe el (corporate trust), "to the point", comunicare în limba română. Fii concis, fără paragrafe lungi.
-`;
+Pachetul Full Service (1300–1500€):
+• Tot ce include Standard
+• Prioritate maximă în lotul curent (loc garantat)
+• RCA Bulgaria pe 3 luni inclus
+• Serviciu de reprezentare daune valabil
+• Consultanță VIP dedicată
 
-    // Map the internal `{ role: "user" | "model", text: string }` format to OpenAI's `{ role: "user" | "assistant", content: string }`
-    const mappedMessages = messages.map((m: any) => ({
-      role: m.role === "model" ? "assistant" : "user",
-      content: m.text
-    }));
+=== DETALII ESENȚIALE ===
+• Durata totală: 5–10 zile lucrătoare de la preluare
+• Sistem de loturi: grupăm 3–10 mașini per transport = costuri minime
+• Maxim 10 locuri per lot, avans 600€ pentru rezervare
+• Servicii B2B (flote) și B2C (persoane fizice)
+• 100% legal, fără taxe ascunse la fața locului
+• Prețul confirmat rămâne fix — zero surprize
 
-    const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_API_MODEL || "gpt-4o-mini", // Fallback model
-      messages: [
-        { role: "system", content: systemInstruction },
-        ...mappedMessages
-      ],
+=== REGULI STRICTE DE RĂSPUNS ===
+1. RĂSPUNDE DOAR ÎN LIMBA ROMÂNĂ, direct și concis (2-4 propoziții maxim).
+2. Identifică-te ca Asistentul AutoConnect dacă ești întrebat cine ești.
+3. NU incluce niciodată: analize, reasoning, metadate, gânduri interne, tag-uri, JSON, sau prefixe precum "Assistant:".
+4. Când compară pachete, folosește bullet points scurte.
+5. Dacă nu știi un detaliu exact → recomandă formularul de contact pentru ofertă personalizată.
+6. Dacă utilizatorul e interesat de rezervare → menționează avansul de 600€ și butonul "Rezervă Loc".
+7. Pentru întrebări off-topic → redirecționează politicos spre serviciile AutoConnect.`;
+ const mappedMessages = incomingMessages.map((m: any) => ({
+ role: m.role === "model" ? "assistant" : m.role,
+ content: m.content ?? m.text ?? "",
+ }));
+
+    const payload = {
+      model: process.env.OPENAI_API_MODEL || "openai/gpt-4o-mini",
+      messages: [{ role: "system", content: systemInstruction }, ...mappedMessages],
       temperature: 0.5,
-      stream: true,
-    });
-    
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        for await (const chunk of response) {
-          const content = chunk.choices[0]?.delta?.content || "";
-          if (content) {
-            controller.enqueue(encoder.encode(content));
-          }
-        }
-        controller.close();
+    };
+
+    let content = "";
+    try {
+      const endpoint = `${baseURL}/v1/chat/completions`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+ const errText = await response.text();
+ throw new Error(`AI API ${response.status}: ${errText.slice(0, 500)}`);
       }
-    });
+      const data = await response.json();
+      content = data?.choices?.[0]?.message?.content ?? data?.choices?.[0]?.message?.reasoning_content ?? "";
+      // Remove any analysis lines that may still be present.
+      if (content) {
+        const cleaned = content
+          .split('\n')
+          .filter(line => !/Analyze|Identify|Intent|Context|User (said|says|input)/i.test(line))
+          .join('\n')
+          .trim();
+        content = cleaned || content;
+      }
+    } catch (aiErr: any) {
+      console.error("AI request failed:", aiErr);
+      return json({ error: aiErr.message || "AI service error" }, { status: 502 });
+    }
 
-    return new Response(stream, {
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-    });
-
-  } catch (error: any) {
-    console.error("Chat API error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!content) {
+      content = "Îmi pare rău, momentan nu pot genera un răspuns. Te rog să încerci din nou în câteva minute.";
+    }
+    return json({ content });
+  } catch (e: any) {
+    console.error("Chat API error:", e);
+    return json({ error: e.message }, { status: 500 });
   }
 }
