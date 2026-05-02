@@ -1,0 +1,74 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 1. Primitive Definition
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+
+    // 2. Validation Blueprints
+    function isValidLead(data) {
+      return data.keys().hasAll(['name', 'phone', 'source', 'createdAt']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.phone is string && data.phone.size() > 0 && data.phone.size() <= 50 &&
+        data.source is string && data.source.matches('^(web|telegram)$') &&
+        data.createdAt == request.time &&
+        (
+          !('userId' in data) || (data.userId is string && data.userId.size() <= 128)
+        ) &&
+        (
+          !('email' in data) || (data.email is string && data.email.size() <= 100)
+        ) &&
+        (
+          !('carMake' in data) || (data.carMake is string && data.carMake.size() <= 100)
+        ) &&
+        (
+          !('carYear' in data) || (data.carYear is string && data.carYear.size() <= 20)
+        ) &&
+        (
+          !('city' in data) || (data.city is string && data.city.size() <= 100)
+        ) &&
+        (
+          !('urgency' in data) || (data.urgency is string && data.urgency.size() <= 20)
+        );
+    }
+
+    function isValidChatContext(data) {
+      return data.keys().hasAll(['chatIdString', 'messages', 'updatedAt']) &&
+        data.chatIdString is string && data.chatIdString.size() > 0 && data.chatIdString.size() <= 50 &&
+        data.messages is list && data.messages.size() <= 1000 &&
+        data.updatedAt == request.time;
+    }
+
+    // 3. Match Blocks
+    match /leads/{leadId} {
+      // Allow anyone to submit a lead (e.g. from web form or nextjs API)
+      // but strictly validate the schema
+      allow create: if isValidId(leadId) && isValidLead(incoming());
+      // No read, update or delete for leads on the client
+    }
+
+    match /chats/{chatId} {
+      // Only allow operations from the server (Next.js API route using client SDK) 
+      // We will allow read and update for chats if the schema is valid and
+      // since the Telegram webhook runs without auth on the client SDK we must allow it
+      allow read: if true; 
+      allow create: if isValidId(chatId) && isValidChatContext(incoming());
+      allow update: if isValidId(chatId) && isValidChatContext(incoming()) && incoming().chatIdString == existing().chatIdString;
+    }
+  }
+}

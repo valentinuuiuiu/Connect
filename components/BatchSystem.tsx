@@ -4,7 +4,7 @@ import { Users, TrendingDown, Layers, Timer } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function BatchSystem() {
-  const [timeLeft, setTimeLeft] = useState(4 * 24 * 60 * 60);
+  const [timeLeft, setTimeLeft] = useState(14 * 24 * 60 * 60);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -119,7 +119,7 @@ export function BatchSystem() {
                 className="w-full flex items-center justify-center gap-2 py-4 bg-zinc-900 text-white font-bold rounded-lg hover:bg-zinc-800 transition-colors shadow-md"
               >
                 <Timer className="w-5 h-5" />
-                Rezervă cu avans acum
+                Aplică pentru următorul lot
               </button>
             </div>
           </motion.div>

@@ -1,0 +1,46 @@
+{
+  "entities": {
+    "Lead": {
+      "title": "Lead",
+      "description": "Customer lead from web form or telegram",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "carMake": { "type": "string" },
+        "carYear": { "type": "string" },
+        "city": { "type": "string" },
+        "urgency": { "type": "string" },
+        "source": { "type": "string", "enum": ["web", "telegram"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "phone", "source", "createdAt"]
+    },
+    "ChatContext": {
+      "title": "Chat Context",
+      "description": "Stored messages for telegram bot memory",
+      "type": "object",
+      "properties": {
+        "chatIdString": { "type": "string", "description": "Stringified chat ID" },
+        "messages": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["chatIdString", "messages", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/leads/{leadId}": {
+      "schema": { "$ref": "Lead" },
+      "description": "Customer leads"
+    },
+    "/chats/{chatId}": {
+      "schema": { "$ref": "ChatContext" },
+      "description": "Memory for the telegram bot where chatId is the document id."
+    }
+  }
+}

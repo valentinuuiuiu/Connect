@@ -5,35 +5,41 @@ import { Send, AlertCircle } from "lucide-react";
 
 export function LeadForm() {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [formData, setFormData] = useState({
+    marca: "",
+    an: "",
+    oras: "",
+    telefon: "",
+    email: "",
+    urgency: "normal"
+  });
+  const [emailError, setEmailError] = useState("");
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setEmailError("");
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setEmailError("Te rugăm să introduci o adresă de email validă.");
+      return;
+    }
+
     setStatus("loading");
     
     try {
-      const form = e.target as HTMLFormElement;
-      const model = (form.elements[0] as HTMLInputElement).value;
-
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          packageId: 'Standard',
-          amount: 600 // Avans de 600 EUR
-        })
+      await fetch("/api/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
       });
-
-      const data = await response.json();
-      
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        console.error('No URL returned from checkout step:', data.error);
-        setStatus("error");
-      }
-    } catch (error) {
-      console.error('Error during checkout redirection:', error);
+      setStatus("success");
+    } catch (err) {
+      console.error(err);
       setStatus("error");
     }
   };
@@ -57,7 +63,7 @@ export function LeadForm() {
           <div className="relative z-10 max-w-2xl">
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">Rezervă Loc în Următorul Lot</h2>
             <p className="text-zinc-400 mb-10 text-lg">
-              Completează datele mașinii și achită avansul fix de 600€ prin Stripe (100% securizat, cu emitere factură). Restul sumei se achită la finalizarea procesului.
+              Deplasările spre Bulgaria se fac o dată la 2 săptămâni! Completează datele mașinii pentru a rezerva un loc în următorul lot. Costurile exacte și avansul necesar variază și vor fi calculate individual, urmând să te contactăm telefonic pentru stabilire.
             </p>
 
             {status === "success" ? (
@@ -79,6 +85,9 @@ export function LeadForm() {
                     <label className="text-sm font-bold text-zinc-300 uppercase tracking-wider">Marca și Model</label>
                     <input 
                       required
+                      name="marca"
+                      value={formData.marca}
+                      onChange={handleChange}
                       type="text" 
                       placeholder="ex. BMW M3"
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
@@ -88,6 +97,9 @@ export function LeadForm() {
                     <label className="text-sm font-bold text-zinc-300 uppercase tracking-wider">An fabricație</label>
                     <input 
                       required
+                      name="an"
+                      value={formData.an}
+                      onChange={handleChange}
                       type="text" 
                       placeholder="ex. 2018"
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
@@ -100,6 +112,9 @@ export function LeadForm() {
                     <label className="text-sm font-bold text-zinc-300 uppercase tracking-wider">Orașul tău / Județ</label>
                     <input 
                       required
+                      name="oras"
+                      value={formData.oras}
+                      onChange={handleChange}
                       type="text" 
                       placeholder="ex. București"
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
@@ -109,6 +124,9 @@ export function LeadForm() {
                     <label className="text-sm font-bold text-zinc-300 uppercase tracking-wider">Telefon contact (WhatsApp)</label>
                     <input 
                       required
+                      name="telefon"
+                      value={formData.telefon}
+                      onChange={handleChange}
                       type="tel" 
                       placeholder="ex. 07xx xxx xxx"
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
@@ -117,16 +135,32 @@ export function LeadForm() {
                 </div>
 
                 <div className="space-y-2">
+                  <label className="text-sm font-bold text-zinc-300 uppercase tracking-wider">Adresă de Email</label>
+                  <input 
+                    required
+                    name="email"
+                    type="email" 
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="ex. nume@exemplu.ro"
+                    className={`w-full bg-zinc-950 border ${emailError ? 'border-red-500' : 'border-zinc-800'} rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors`}
+                  />
+                  {emailError && (
+                    <p className="text-sm text-red-500 mt-1">{emailError}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-sm font-bold text-zinc-300 uppercase tracking-wider">Urgență Procesare</label>
                   <div className="grid grid-cols-2 gap-4">
                     <label className="cursor-pointer relative">
-                      <input type="radio" name="urgency" value="normal" className="peer sr-only" defaultChecked />
+                      <input onChange={handleChange} type="radio" name="urgency" value="normal" className="peer sr-only" checked={formData.urgency === 'normal'} />
                       <div className="w-full text-center bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-400 peer-checked:bg-emerald-600/10 peer-checked:border-emerald-500 peer-checked:text-white transition-all shadow-sm font-medium">
                         Normal (Lot standard)
                       </div>
                     </label>
                     <label className="cursor-pointer relative">
-                      <input type="radio" name="urgency" value="rapid" className="peer sr-only" />
+                      <input onChange={handleChange} type="radio" name="urgency" value="rapid" className="peer sr-only" checked={formData.urgency === 'rapid'} />
                       <div className="w-full text-center bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-zinc-400 peer-checked:bg-orange-500/10 peer-checked:border-orange-500 peer-checked:text-white transition-all shadow-sm flex items-center justify-center gap-2 font-medium">
                         Super Rapid <AlertCircle className="w-4 h-4 peer-checked:text-orange-400" />
                       </div>
@@ -143,7 +177,7 @@ export function LeadForm() {
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     <>
-                      Plătește Avansul (600 €)
+                      Trimite Cererea pentru Calcul
                       <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                     </>
                   )}
